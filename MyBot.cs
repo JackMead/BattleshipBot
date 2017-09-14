@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Battleships.Player.Interface;
 
 namespace BattleshipBot
@@ -7,7 +8,7 @@ namespace BattleshipBot
     {
         private IGridSquare lastTarget;
         private bool targetAcquired=false;
-        private bool targetVertical = false;
+        private Targeter.Orientation targetOrientation = Targeter.Orientation.Unknown;
         private List<IGridSquare> targetHits=new List<IGridSquare>();
         private Targeter targeter=new Targeter();
         private List<IGridSquare> shotsMade = new List<IGridSquare>();
@@ -24,11 +25,12 @@ namespace BattleshipBot
         public IGridSquare SelectTarget()
         {
             var nextTarget = GetNextTarget();
-            lastTarget = nextTarget;
-            while (shotsMade.Contains(nextTarget))
+            while(shotsMade.Contains(nextTarget)|| !targeter.ShotIsValid((GridSquare)nextTarget))
             {
                 nextTarget = targeter.GetRandomTarget(shotsAvailable);
             }
+            lastTarget = nextTarget;
+            shotsAvailable.Remove(nextTarget);
             shotsMade.Add(nextTarget);
             return nextTarget;
         }
@@ -53,12 +55,31 @@ namespace BattleshipBot
                 return targeter.SearchForTarget(lastTarget);
             }
 
-            return targeter.ContinueAimingAtTarget(shotsMade, targetHits, Targeter.Orientation.Unknown);
+            UpdateOrientation();
+
+            return targeter.ContinueAimingAtTarget(shotsMade, targetHits,targetOrientation);
+        }
+
+        private void UpdateOrientation()
+        {
+            if (targetHits.Count < 2)
+            {
+                targetOrientation= Targeter.Orientation.Unknown;
+                return;
+            }
+
+            if (targetHits[0].Row == targetHits[1].Row)
+            {
+                targetOrientation= Targeter.Orientation.Horizontal;
+                return;
+            }
+
+            targetOrientation = Targeter.Orientation.Vertical;
         }
 
         private void SetUpShotsAvailableList()
         {
-            for (int row = AAsInt+1; row < AAsInt + 11; row++)
+            for (int row = AAsInt; row < AAsInt + 10; row++)
             {
                 for (int col = 1; col < 11; col++)
                 {
@@ -74,12 +95,66 @@ namespace BattleshipBot
                 return false;
             }
 
-            //TODO
-            //if on same row
-            //do stuff
+            if (targetHits.Count == 5)
+            {
+                return true;
+            }
+            
+            if (targetHits[0].Row == targetHits[1].Row)
+            {
+                if (IsHorizontallyDestroyed(targetHits))
+                {
+                    return true;
+                }
+            }
 
-            //if on same col
-            //do stuff
+            if (targetHits[0].Column == targetHits[1].Column)
+            {
+                if (IsVerticallyDestroyed(targetHits))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsVerticallyDestroyed(List<IGridSquare> targetHits)
+        {
+            var lowestShot = targetHits.OrderBy(r => r.Row).ToList()[0];
+            var highestShot = targetHits.OrderByDescending(r => r.Row).ToList()[0];
+
+            if (lowestShot.Row != 'A' &&
+                shotsAvailable.Contains(new GridSquare((char) (lowestShot.Row - 1), lowestShot.Column)))
+            {
+                return false;
+            }
+
+            if (highestShot.Row != 'J' &&
+                shotsAvailable.Contains(new GridSquare((char) (highestShot.Row + 1), highestShot.Column)))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsHorizontallyDestroyed(List<IGridSquare> targetHits)
+        {
+            var leftMostHit = targetHits.OrderBy(r => r.Column).ToList()[0];
+            var rightMostHit = targetHits.OrderByDescending(r => r.Column).ToList()[0];
+
+            if (leftMostHit.Column != 1 &&
+                shotsAvailable.Contains(new GridSquare((char)(leftMostHit.Row), leftMostHit.Column-1)))
+            {
+                return false;
+            }
+
+            if (rightMostHit.Column != 10 &&
+                shotsAvailable.Contains(new GridSquare((char)(rightMostHit.Row), rightMostHit.Column+1)))
+            {
+                return false;
+            }
 
             return true;
         }
