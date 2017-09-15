@@ -10,30 +10,40 @@ namespace BattleshipBot
     class Targeter
     {
         private int AAsInt = 65;
-        private int initialSearchSpacing = 3;
-        public IGridSquare SearchForTarget(IGridSquare lastTarget)
+        private int initialSearchSpacing = 4;
+        public enum Orientation
+        {
+            Vertical, Horizontal, Unknown
+        }
+
+        public IGridSquare SearchForTarget(IGridSquare lastTarget, List<IGridSquare> shotsMade, List<IGridSquare> shotsAvailable)
         {
             var row = lastTarget.Row;
             var col = lastTarget.Column + initialSearchSpacing;
 
-            if (col <= 10)
+            if (col > 10)
             {
-                return new GridSquare(row, col);
+                row = (char)(row + 1);
+                if (row > 'J')
+                {
+                    row = 'A';
+                }
+
+                col = (row % initialSearchSpacing) + 1;
             }
 
-            row = (char)(row + 1);
-            if (row > 'J')
+            var newTarget = new GridSquare(row, col);
+            if (!shotsMade.Contains(newTarget))
             {
-                row = 'A';
+                return newTarget;
             }
 
-            col = (row % initialSearchSpacing) + 1;
+            if (!shotsMade.Contains(SearchForTarget(newTarget, shotsMade, shotsAvailable)))
+            {
+                return SearchForTarget(newTarget, shotsMade, shotsAvailable);
+            }
 
-            return new GridSquare(row, col);
-        }
-        public enum Orientation
-        {
-            Vertical, Horizontal, Unknown
+            return GetRandomTarget(shotsAvailable);
         }
 
         public IGridSquare GetRandomTarget(List<IGridSquare> shotsAvailable)
@@ -50,7 +60,7 @@ namespace BattleshipBot
             //Better shooting
             if (orientation == Orientation.Unknown)
             {
-                return ShotToSideOfHit(targetHits, shotsMade);
+                return ShotToSideOfHit(shotsMade, targetHits);
             }
 
             if (orientation == Orientation.Vertical)
@@ -70,7 +80,7 @@ namespace BattleshipBot
         {
             var shot = targetHits.OrderBy(r => r.Column).ToList()[0];
             var shotLeft = new GridSquare(shot.Row, shot.Column - 1);
-            if (ShotIsValid(shotLeft)&& !shotsMade.Contains(shotLeft))
+            if (ShotIsValid(shotLeft) && !shotsMade.Contains(shotLeft))
             {
                 return shotLeft;
             }
@@ -84,12 +94,12 @@ namespace BattleshipBot
         {
             var shot = targetHits.OrderBy(r => r.Row).ToList()[0];
             var shotUp = new GridSquare((char)(shot.Row - 1), shot.Column);
-            if (ShotIsValid(shotUp)&& !shotsMade.Contains(shotUp))
+            if (ShotIsValid(shotUp) && !shotsMade.Contains(shotUp))
             {
                 return shotUp;
             }
             shot = targetHits.OrderByDescending(r => r.Row).ToList()[0];
-            var shotDown = new GridSquare((char)(shot.Row - 1), shot.Column);
+            var shotDown = new GridSquare((char)(shot.Row + 1), shot.Column);
 
             return shotDown;
         }
@@ -97,22 +107,22 @@ namespace BattleshipBot
         private IGridSquare ShotToSideOfHit(List<IGridSquare> shotsMade, List<IGridSquare> targetHits)
         {
             var shot = targetHits[0];
-            var shotToLeft = new GridSquare(shot.Row, shot.Column - 1);
-            if (!shotsMade.Contains(shotToLeft) && ShotIsValid(shotToLeft))
+            var shotToRight = new GridSquare(shot.Row, shot.Column + 1);
+            if (!shotsMade.Contains(shotToRight) && ShotIsValid(shotToRight))
             {
-                return shotToLeft;
+                return shotToRight;
             }
             var shotUp = new GridSquare((char)(shot.Row - 1), shot.Column);
             if (!shotsMade.Contains(shotUp) && ShotIsValid(shotUp))
             {
                 return shotUp;
             }
-            var shotToRight = new GridSquare(shot.Row, shot.Column + 1);
-            if (!shotsMade.Contains(shotToRight) && ShotIsValid(shotToRight))
+            var shotToLeft = new GridSquare(shot.Row, shot.Column - 1);
+            if (!shotsMade.Contains(shotToLeft) && ShotIsValid(shotToLeft))
             {
-                return shotToRight;
+                return shotToLeft;
             }
-            
+
             var shotDown = new GridSquare((char)(shot.Row + 1), shot.Column);
             if (!shotsMade.Contains(shotDown) && ShotIsValid(shotDown))
             {

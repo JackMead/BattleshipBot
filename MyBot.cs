@@ -7,6 +7,7 @@ namespace BattleshipBot
     public class MyBot : IBattleshipsBot
     {
         private IGridSquare lastTarget;
+        private IGridSquare lastSearchingShot;
         private bool targetAcquired=false;
         private Targeter.Orientation targetOrientation = Targeter.Orientation.Unknown;
         private List<IGridSquare> targetHits=new List<IGridSquare>();
@@ -29,6 +30,10 @@ namespace BattleshipBot
             {
                 nextTarget = targeter.GetRandomTarget(shotsAvailable);
             }
+            if (!targetAcquired)
+            {
+                lastSearchingShot = nextTarget;
+            }
             lastTarget = nextTarget;
             shotsAvailable.Remove(nextTarget);
             shotsMade.Add(nextTarget);
@@ -47,12 +52,12 @@ namespace BattleshipBot
             {
                 targetAcquired = false;
                 targetHits=new List<IGridSquare>();
-                lastTarget = targeter.GetRandomTarget(shotsAvailable);
+                lastTarget = lastSearchingShot;
             }
 
             if (!targetAcquired)
             {
-                return targeter.SearchForTarget(lastTarget);
+                return targeter.SearchForTarget(lastTarget, shotsMade, shotsAvailable);
             }
 
             UpdateOrientation();
@@ -173,6 +178,6 @@ namespace BattleshipBot
             // Ignore what our opponent does
         }
 
-        public string Name => "Jack M's Initial Bot";
+        public string Name => "Botty McBotFace";
     }
 }

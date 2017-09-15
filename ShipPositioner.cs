@@ -15,14 +15,17 @@ namespace BattleshipBot
 
         public IEnumerable<IShipPosition> GetRandomShipPositioning()
         {
-            //Ship theory: place patrol boat in a corner, then randomize the others?
-            //TODO
 
-            //For now, randomly place each on a different horizontal line
+            //TODO
+            //Decide final strategy and implement. For now, patrol boat in corner vertically, others randomly horizontally
             var rowsForShips = new int[5];
             rowsForShips[0] = rand.Next(AAsInt, AAsInt + 10);
+            var colsForShips = new int[5];
+            colsForShips[0] = rand.Next(1, 5);
+            var listOfShipPositions = new List<IShipPosition>();
 
-            for (int i = 1; i < 5; i++)
+
+            for (int i = 1; i < 4; i++)
             {
                 rowsForShips[i] = rowsForShips[i - 1] + 2;
                 if (rowsForShips[i] > AAsInt + 9)
@@ -31,18 +34,40 @@ namespace BattleshipBot
                 }
             }
 
-            var listOfShipPositions = new List<IShipPosition>();
-
-            var colsForShips = new int[5];
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 4; i++)
             {
-                colsForShips[i] = rand.Next(1, 12 - listOfBoatLengths[i]);
+                //TODO sort this out
+                //For now, can't touch edges to avoid patrol boat clash
+                colsForShips[i] = rand.Next(2, 11 - listOfBoatLengths[i]);
                 ShipPosition ship = GetShipPosition((char)rowsForShips[i], colsForShips[i], (char)rowsForShips[i],
                     colsForShips[i] + listOfBoatLengths[i] - 1);
                 listOfShipPositions.Add(ship);
             }
 
+            ShipPosition patrolBoat = GetPatrolBoatInCorner();
+            listOfShipPositions.Add(patrolBoat);
             return listOfShipPositions;
+        }
+
+        private ShipPosition GetPatrolBoatInCorner()
+        {
+            switch (rand.Next(0, 4))
+            {
+                case 0:
+                    return GetShipPosition('A', 1, 'B', 1);
+
+                case 1:
+                    return GetShipPosition('A', 10, 'B', 10);
+
+                case 2:
+                    return GetShipPosition('I', 1, 'J', 1);
+
+                case 3:
+                    return GetShipPosition('I', 10, 'J', 10);
+
+                    default:
+                        return GetShipPosition('A', 1, 'B', 1);
+            }
         }
 
         private ShipPosition GetShipPosition(char startRow, int startColumn, char endRow, int endColumn)
