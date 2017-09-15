@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Battleships.Player.Interface;
 
@@ -8,25 +9,38 @@ namespace BattleshipBot
     {
         private IGridSquare lastTarget;
         private IGridSquare lastSearchingShot;
-        private bool targetAcquired=false;
+        private bool targetAcquired = false;
         private Targeter.Orientation targetOrientation = Targeter.Orientation.Unknown;
-        private List<IGridSquare> targetHits=new List<IGridSquare>();
-        private Targeter targeter=new Targeter();
+        private List<IGridSquare> targetHits = new List<IGridSquare>();
+        private Targeter targeter = new Targeter();
         private List<IGridSquare> shotsMade = new List<IGridSquare>();
         private List<IGridSquare> shotsAvailable = new List<IGridSquare>();
         private int AAsInt = 65;
+        private Random rand = new Random();
+        private List<int> listOfBoatLengthsRemaining = new List<int> { 5, 4, 3, 3, 2 };
 
         public IEnumerable<IShipPosition> GetShipPositions()
         {
-            lastTarget = null; // Forget all our history when we start a new game
+            ResetMemory();
+            return new ShipPositioner().GetShipPositionsUnknownStrategy(new Random().Next(0, 5));
+        }
 
-            return new ShipPositioner().GetRandomShipPositioning();
+        private void ResetMemory()
+        {
+            lastTarget = null;
+            lastSearchingShot = null;
+            targetAcquired = false;
+            targetOrientation = Targeter.Orientation.Unknown;
+            targetHits = new List<IGridSquare>();
+            shotsMade = new List<IGridSquare>();
+            SetUpShotsAvailableList();
+            listOfBoatLengthsRemaining = new List<int> { 5, 4, 3, 3, 2 };
         }
 
         public IGridSquare SelectTarget()
         {
             var nextTarget = GetNextTarget();
-            while(shotsMade.Contains(nextTarget)|| !targeter.ShotIsValid((GridSquare)nextTarget))
+            while (shotsMade.Contains(nextTarget) || !targeter.ShotIsValid((GridSquare)nextTarget))
             {
                 nextTarget = targeter.GetRandomTarget(shotsAvailable);
             }
@@ -42,16 +56,12 @@ namespace BattleshipBot
 
         private IGridSquare GetNextTarget()
         {
-            if (lastTarget == null)
-            {
-                SetUpShotsAvailableList();
-                return new GridSquare('F', 2);
-            }
-
             if (IsTargetDestroyed())
             {
                 targetAcquired = false;
-                targetHits=new List<IGridSquare>();
+                RemoveSurroundingShotsForTargetBoat();
+                listOfBoatLengthsRemaining.Remove(targetHits.Count);
+                targetHits = new List<IGridSquare>();
                 lastTarget = lastSearchingShot;
             }
 
@@ -62,20 +72,53 @@ namespace BattleshipBot
 
             UpdateOrientation();
 
-            return targeter.ContinueAimingAtTarget(shotsMade, targetHits,targetOrientation);
+            return targeter.ContinueAimingAtTarget(shotsMade, targetHits, targetOrientation, shotsAvailable);
+        }
+
+        private void RemoveSurroundingShotsForTargetBoat()
+        {
+            foreach (var hit in targetHits)
+            {
+                RemoveSurroundingShotsForSquare(hit);
+            }
+        }
+
+        private void RemoveSurroundingShotsForSquare(IGridSquare hit)
+        {
+            var squareAbove = new GridSquare((char)(hit.Row - 1), hit.Column);
+            var squareLeft = new GridSquare((char)(hit.Row), hit.Column - 1);
+            var squareRight = new GridSquare((char)(hit.Row), hit.Column + 1);
+            var squareBelow = new GridSquare((char)(hit.Row + 1), hit.Column);
+
+            if (shotsAvailable.Contains(squareBelow))
+            {
+                shotsAvailable.Remove(squareBelow);
+            }
+            if (shotsAvailable.Contains(squareAbove))
+            {
+                shotsAvailable.Remove(squareAbove);
+            }
+            if (shotsAvailable.Contains(squareLeft))
+            {
+                shotsAvailable.Remove(squareLeft);
+            }
+            if (shotsAvailable.Contains(squareRight))
+            {
+                shotsAvailable.Remove(squareRight);
+            }
         }
 
         private void UpdateOrientation()
         {
             if (targetHits.Count < 2)
             {
-                targetOrientation= Targeter.Orientation.Unknown;
+                targetOrientation = Targeter.Orientation.Unknown;
                 return;
             }
 
             if (targetHits[0].Row == targetHits[1].Row)
             {
-                targetOrientation= Targeter.Orientation.Horizontal;
+                targetOrientation = Targeter.Orientation.Horizontal;
                 return;
             }
 
@@ -84,11 +127,12 @@ namespace BattleshipBot
 
         private void SetUpShotsAvailableList()
         {
+            shotsAvailable = new List<IGridSquare>();
             for (int row = AAsInt; row < AAsInt + 10; row++)
             {
                 for (int col = 1; col < 11; col++)
                 {
-                    shotsAvailable.Add(new GridSquare((char) row, col));
+                    shotsAvailable.Add(new GridSquare((char)row, col));
                 }
             }
         }
@@ -100,11 +144,11 @@ namespace BattleshipBot
                 return false;
             }
 
-            if (targetHits.Count == 5)
+            if (targetHits.Count == listOfBoatLengthsRemaining.Max())
             {
                 return true;
             }
-            
+
             if (targetHits[0].Row == targetHits[1].Row)
             {
                 if (IsHorizontallyDestroyed(targetHits))
@@ -130,13 +174,13 @@ namespace BattleshipBot
             var highestShot = targetHits.OrderByDescending(r => r.Row).ToList()[0];
 
             if (lowestShot.Row != 'A' &&
-                shotsAvailable.Contains(new GridSquare((char) (lowestShot.Row - 1), lowestShot.Column)))
+                shotsAvailable.Contains(new GridSquare((char)(lowestShot.Row - 1), lowestShot.Column)))
             {
                 return false;
             }
 
             if (highestShot.Row != 'J' &&
-                shotsAvailable.Contains(new GridSquare((char) (highestShot.Row + 1), highestShot.Column)))
+                shotsAvailable.Contains(new GridSquare((char)(highestShot.Row + 1), highestShot.Column)))
             {
                 return false;
             }
@@ -150,13 +194,13 @@ namespace BattleshipBot
             var rightMostHit = targetHits.OrderByDescending(r => r.Column).ToList()[0];
 
             if (leftMostHit.Column != 1 &&
-                shotsAvailable.Contains(new GridSquare((char)(leftMostHit.Row), leftMostHit.Column-1)))
+                shotsAvailable.Contains(new GridSquare((char)(leftMostHit.Row), leftMostHit.Column - 1)))
             {
                 return false;
             }
 
             if (rightMostHit.Column != 10 &&
-                shotsAvailable.Contains(new GridSquare((char)(rightMostHit.Row), rightMostHit.Column+1)))
+                shotsAvailable.Contains(new GridSquare((char)(rightMostHit.Row), rightMostHit.Column + 1)))
             {
                 return false;
             }
